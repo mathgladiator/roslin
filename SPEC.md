@@ -1,21 +1,19 @@
 # Roslin Specification
 
-# Let's set the scene
-
-This document outlines the specification for roslin which is a reactive runtime for board games. Roslin is designed as a UX mirror to [Adama](https://github.com/mathgladiator/adama-lang), and the expectation is that Roslin + Adama = a game.
+This document outlines the specification for [roslin](https://github.com/mathgladiator/roslin) which is a reactive runtime for board games. Roslin is designed as a UX mirror to [Adama](https://github.com/mathgladiator/adama-lang), and the expectation is that Roslin + Adama = a game.
 
 **About the name:** [roslin](https://en.wikipedia.org/wiki/Laura_Roslin) is derived from [Battlestar Galatica](https://www.imdb.com/title/tt0407362/) which is how the author and his wife named their goats.
 
 ## Goals &amp; Requirements
 
-* Provide a fantastic user experience for board game players on multiple devices (tv, gameboard, phone, tablet)
+* Provide a fantastic user experience for board game players on multiple devices (tv, [gameboard](https://lastgameboard.com/), phone, tablet)
 * Serve as a mostly-logic-free template engine to turn a streaming-JSON object into an interactive image.
 * Small footprint and lean implementation for low-end devices and battery friendly execution
 * The format should be easily edited by humans and tools
 
 ## Non-goals
 
-This runtime should extend beyond board games, but this is the path towards madness. The initial version should be 100% focus on board games and the challenges presented by them. Focus!
+This runtime should extend beyond board games, but this is the path towards madness. The initial version should be 100% focused on board games and the challenges presented by them. Focus!
 
 # Format
 
@@ -28,7 +26,8 @@ The root object of the format has XYZ fields which are
 * assets
 ** search
 * forest
-* setup
+** default
+* systems
 
 ## Assets
 
@@ -36,7 +35,7 @@ The root field "assets" is an object providing a mapping of names (i.e. asset id
 
 Beyond mapping asset ids to files, the asset object is opportunity to provide parameters on how that particular asset is to be used. For example, a nine-patch image requires four integer values as to how to slice the image up to scale. Similarly, a set of assets may share a file with different parameters so tile-maps and tile-assets may be used.
 
-### 'assets' example ###
+### 'assets' example
 
 ```js
 {
@@ -51,5 +50,47 @@ Beyond mapping asset ids to files, the asset object is opportunity to provide pa
 
 ## Forest
 
-## Setup
+Roslin uses an [l-system](https://en.wikipedia.org/wiki/L-system) inspired approach where you have a forest of cards. Cards are simply functions that turn JSON into a scalable image. The root field "forest" is an object mapping names (i.e. card ids) to cards. A card is an object with instructions on how to pull data from JSON, draw it, and map any feedback. First, a card has a minimal dimensions represented by the "width" and "height" fields which have units within. Second, the card also has a field called "items" which is a list of items. An item is an object which must contain a "type" field as a string, and the value of the "type" field will determine the behavior of the item.
 
+For simplicity, the "type" value "simple-shape" has three parameters: "shape", "stroke", "fill" which sit inside the object. More details can be found in the later sections, but we will set "shape" to "box" to render a box with stroke set to "#000" and fill set to "#fff". This will render a white box with a black border.
+
+We give this card the name "simple-white-box", and then use the top-level field "default" to set this card as the root card.
+
+### minimal 'forest' example
+
+```js
+{
+    "forest": {
+        "simple-white-box": {
+            "width": 400,
+            "height": 300,
+            "items": [
+                {
+                    "type":"simple-shape",
+                    "shape":"box",
+                    "stroke":"#000",
+                    "fill":"#fff"
+                }
+
+            ]
+        }
+    },
+    "default":"simple-white-box"
+}
+```
+
+## Item types
+
+### Common properties for visual items
+
+### Simple Shape
+
+### Plot
+
+### Switch
+
+### If
+
+### Layout
+
+## Systems
