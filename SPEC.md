@@ -21,7 +21,7 @@ Roslin is plain-ole JSON structured under a schema that we will describe as this
 
 ## Top level
 
-The root object of the format has XYZ fields which are 
+The root object has these fields
 
 * assets
 ** search
@@ -79,13 +79,23 @@ We give this card the name "simple-white-box", and then use the top-level field 
 }
 ```
 
-## Item types
+## Systems
+
+The l-system will produce a scene tree, but an important aspect of online board games is animation which requires branches within the tree to migrate. This is accomplished via systems which provide tracking of branches that can be mounted within the l-system tree. This is a solution to a problem that emerges from the reactive binding and deck builders, so it's worth taking a look at the nature of the problem.
+
+In a deck builder, like [Dominion](https://en.wikipedia.org/wiki/Dominion_(card_game)), cards are all over the place. The are cards in the supply, trash piles, your hand, your discard, your deck, in play, in reserve, etc. There are many places that a specific card can be, and when a card changes between places we need a way to smoothly animate that changes. This is exceptionally interested as we also aim to maximize privacy.
+
+## Card item types
 
 ### Common properties for visual items
 
-### Simple Shape
+A card uses a box-model
+
+### Simple shape
+This is primarily a test shape for the developers
 
 ### Plot
+Plot an asset (movies)
 
 ### Switch
 
@@ -93,4 +103,3 @@ We give this card the name "simple-white-box", and then use the top-level field 
 
 ### Layout
 
-## Systems
