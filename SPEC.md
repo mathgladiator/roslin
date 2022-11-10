@@ -1,5 +1,7 @@
 # Roslin Specification
 
+<font color="red">Super Draft; no spelling nor grammar consults, 100% human</font>
+
 This document outlines the specification for [roslin](https://github.com/mathgladiator/roslin) which is a reactive runtime for board games. Roslin is designed as a UX mirror to [Adama](https://github.com/mathgladiator/adama-lang), and the expectation is that Roslin + Adama = a game.
 
 **About the name:** [roslin](https://en.wikipedia.org/wiki/Laura_Roslin) is derived from [Battlestar Galatica](https://www.imdb.com/title/tt0407362/) which is how the author and his wife named their goats.
@@ -21,13 +23,7 @@ Roslin is plain-ole JSON structured under a schema that we will describe as this
 
 ## Top level
 
-The root object has these fields
-
-* assets
-** search
-* forest
-** default
-* systems
+The root object has many fields: assets, search, forest, default, channels, and more. These root fields will be defined throughout the document.
 
 ## Assets
 
@@ -79,7 +75,59 @@ We give this card the name "simple-white-box", and then use the top-level field 
 }
 ```
 
-## Items
+## Channels
+
+ A channel is fundamentally a publisher-subscriber system using ids. Items use a goal centric animation system where the dimensions of the item are published globally, and the manifested dimensions are continuously transformed from the current to future. This allows cards to transition from various places.
+
+ Channels are configured with various speed to indicate how fast the transformation happens. Items may also provide movement restrictions on a channel. For example, the linear path from an item's current location may intersect an item. If so, then the entry and exit point are determined by the intersected item.
+
+## From board games to items
+
+We will be using this concept of a card in multiple ways. A card may be a play area, a token, a board, part of a board, a hand of cards, an actual card, and many more. As such, we need to elicit a variety of types that define cards.
+
+### Chess
+
+Chess is a simple game and can be broken down into a 8x8 board and 32 pieces of various types. Adama would provide three arrays: *pieces_in_play*, *white_capture*, *black_capture*. Roslin would then visualize the game with these items:
+
+* A grid token holder
+* Black and white token capture zones
+
+The grid token holder would be configured to be 8x8 grid and bound to *pieces_in_play*. Either this grid has a background image of the board, or we introduce a new array *board_cells* which has a boolean/enum to indicate black/white. If the array dictates the color of the cell, then the grid component can use a tileset/tilecard and select a card to render per cell. Both *pieces_in_play* and *board_cells* would require an X and Y coordinate.
+
+A capture zone will simply render tokens using a layout algorithm (stacked, random stable plot, etc...)
+
+Animation is achieved by these two items working together by having an animation channel.
+
+One complication is that the orientation of the board should face the active player, and this is easily resolved by creating two versions with black/white facing the user. This requires Adama to emit a *is_play_white* field along with a boolean card selector to pick between "player_black_board" or "player_white_board".
+
+### Hearts
+
+Hearts is fantastic trick taking game which can be broken down to simply your hand, cards in play, your points, and then a count of cards per other player. Adama would need to provide an array of cards in your hand (as *hand*), an array of cards in play (*in_play*), an array of other players with their card counts (*others*) which is sorted per play to the next three players.
+
+Drawing the cards in hand or in play is a simple task of mapping a container item with a layout algorithm (*hand* would use a stacked left to right while *in_play* would use a circular layout with a minimum count) to visualize the cards shown.
+
+Drawing a player would be a repeated container which accepts the count and then renders the card with a layout algorithm.
+
+A core complication of this data invention is that animation is much harder as there is no id to track (for privacy reasons). Worse, we can't infer any animation status from the numbers changing or not. Adama will need to produce a flow table. The repeated container would need to listen to a *card_flow* array with three fields (id_from, id_to, count). Ideally, count will monotonically go up.
+
+### Dominion
+
+In the base game, dominion is a bunch of cards. There are 17 supply piles (three victory cards, three money cards, a curse pile, and ten kingdom cards) which Adama would supply to the user via a count. The player has a deck, their active hand, a discard pile, and a play area. The deck would private to everyone and Adama would supply a counter. The discard pile is also a counter with the top card revealed. The hand is only visible to the player, but it could be revealed due to some actions.
+
+There is also a shared trash pile.
+
+### Monopoly
+
+### Risk
+
+### Battlestar Galatica
+
+
+
+
+
+
+
 
 ### Layout engine
 
