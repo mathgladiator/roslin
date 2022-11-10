@@ -1,6 +1,6 @@
 # Roslin Specification
 
-<font color="red">Super Draft; no spelling nor grammar consults, 100% human</font>
+**SUPER DRAFT: spelling nor grammar consults, 100% human**
 
 This document outlines the specification for [roslin](https://github.com/mathgladiator/roslin) which is a reactive runtime for board games. Roslin is designed as a UX mirror to [Adama](https://github.com/mathgladiator/adama-lang), and the expectation is that Roslin + Adama = a game.
 
