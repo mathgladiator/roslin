@@ -17,6 +17,8 @@ This document outlines the specification for [roslin](https://github.com/mathgla
 
 This runtime should extend beyond board games, but this is the path towards madness. The initial version should be 100% focused on board games and the challenges presented by them. Focus!
 
+Furthermore, the runtime should adapt into non-2D surfaces like VR/AR, but this is beyond this document’s scope.
+
 # Format
 
 Roslin is plain-ole JSON structured under a schema that we will describe as this document unfolds.
@@ -27,9 +29,9 @@ The root object has many fields: assets, search, forest, default, channels, and 
 
 ## Assets
 
-The root field "assets" is an object providing a mapping of names (i.e. asset ids) to assets which the system can pre-load. An asset is an object with a required "url" string field, and "url" represents a file like an image, movie, svg, audio, nine-path image, etc. The "url" identifies the location of the asset's resource and may point to an online resource via HTTP or a local resource. For convenience, an optional top level field called "search" provides an array to provide the runtime a path to search for the resources. The "url" must contain an extension to indicate the nature (image, animation, movie, audio) of the resource.
+The root field "assets" is an object providing a mapping of names (i.e. asset ids) to assets which the system can pre-load. An asset is an object with a required "url" string field, and "url" represents a file like an image, movie, svg, audio, nine-path image, etc. The "url" identifies the location of the asset's resource and may point to an online resource via HTTP or a local resource (using relative pathing). For convenience, an optional top level field called "search" provides an array to provide the runtime a path to search for the resources. The "url" must contain an extension to indicate the nature (image, animation, movie, audio) of the resource.
 
-Beyond mapping asset ids to files, the asset object is opportunity to provide parameters on how that particular asset is to be used. For example, a nine-patch image requires four integer values as to how to slice the image up to scale. Similarly, a set of assets may share a file with different parameters so tile-maps and tile-assets may be used.
+Beyond mapping asset ids to files, the asset object is an opportunity to provide parameters on how that particular asset is to be used. For example, a nine-patch image requires four integer values as to how to slice the image up to scale. Similarly, a set of assets may share a file with different parameters so tile-maps and an image atlas may be used.
 
 ### 'assets' example
 
@@ -46,9 +48,17 @@ Beyond mapping asset ids to files, the asset object is opportunity to provide pa
 
 ## Forest
 
-Roslin uses an [l-system](https://en.wikipedia.org/wiki/L-system) inspired approach where you have a forest of cards. Cards are simply functions that turn JSON into a scalable image. The root field "forest" is an object mapping names (i.e. card ids) to cards. A card is an object with instructions on how to pull data from JSON, draw it, and map any feedback. First, a card has a minimal dimensions represented by the "width" and "height" fields which have pixel units. Second, the card also has a field called "items" which is a list of items. An item is an object which must contain a "type" field as a string, and the value of the "type" field will determine the behavior of the item.
+Roslin uses an [l-system](https://en.wikipedia.org/wiki/L-system) inspired approach where you have a forest of cards. Cards are simply functions that turn JSON into a scalable image. The root field "forest" is an object mapping names (i.e. card ids) to cards. A card is an object with parameters and instructions on how to pull data from JSON, draw it, and map any feedback. 
 
-For simplicity, the "type" value "simple-shape" has three parameters: "shape", "stroke", "fill" which sit inside the object. More details can be found in the later sections, but we will set "shape" to "box" to render a box with stroke set to "#000" and fill set to "#fff". This will render a white box with a black border.
+First, a card has a "x" and "y" boundaries which are in pixel units; boundaries will be explained in [the below section in layout](#layout-engine), but both x and y are arrays where the final element is width and height, respectively.
+
+Second, the card also has a field called "items" which is a array of items. An item is an object which is a dynamically typed object that is determined on the fly.
+
+An item fundamentally uses ideas inspired from [entity component systems](https://en.wikipedia.org/wiki/Entity_component_system) where there are no direct types of items. Instead, the behavior is the composition of fields within an item.
+
+For example, an item may have a field called 'shape' will which indicate the item will render a shape. The 'shape' object has at least three parameters: "shape", "stroke", "fill" which sit inside the object. More details can be found in the later sections, but we will set "shape" to "box" to render a box with stroke set to "#000" and fill set to "#fff". This will render a white box with a black border.
+
+An item may also have a field called matrix which will define how to position and size the box. The defaults of this will be outlined in the [layout engine](#layout-engine) section.
 
 We give this card the name "simple-white-box", and then use the top-level field "default" to set this card as the root card.
 
@@ -58,16 +68,17 @@ We give this card the name "simple-white-box", and then use the top-level field 
 {
     "forest": {
         "simple-white-box": {
-            "width": 400,
-            "height": 300,
+            "x": [0, 400],
+            "y": [0, 300],
             "items": [
                 {
-                    "type":"simple-shape",
-                    "shape":"box",
-                    "stroke":"#000",
-                    "fill":"#fff"
+                    "shape": {
+                        "shape": "box",
+                        "stroke": "#000",
+                        "fill": "#fff"
+                    },
+                    "matrix": { ... }
                 }
-
             ]
         }
     },
@@ -75,117 +86,105 @@ We give this card the name "simple-white-box", and then use the top-level field 
 }
 ```
 
-## Channels
+This minimal example will render a white box. This sets the stage for more details.
 
- A channel is fundamentally a publisher-subscriber system using ids. Items use a goal centric animation system where the dimensions of the item are published globally, and the manifested dimensions are continuously transformed from the current to future. This allows cards to transition from various places.
-
- Channels are configured with various speed to indicate how fast the transformation happens. Items may also provide movement restrictions on a channel. For example, the linear path from an item's current location may intersect an item. If so, then the entry and exit point are determined by the intersected item.
-
-## From board games to items
-
-We will be using this concept of a card in multiple ways. A card may be a play area, a token, a board, part of a board, a hand of cards, an actual card, and many more. As such, we need to elicit a variety of types that define cards.
-
-### Chess
-
-Chess is a simple game and can be broken down into a 8x8 board and 32 pieces of various types. Adama would provide three arrays: *pieces_in_play*, *white_capture*, *black_capture*. Roslin would then visualize the game with these items:
-
-* A grid token holder
-* Black and white token capture zones
-
-The grid token holder would be configured to be 8x8 grid and bound to *pieces_in_play*. Either this grid has a background image of the board, or we introduce a new array *board_cells* which has a boolean/enum to indicate black/white. If the array dictates the color of the cell, then the grid component can use a tileset/tilecard and select a card to render per cell. Both *pieces_in_play* and *board_cells* would require an X and Y coordinate.
-
-A capture zone will simply render tokens using a layout algorithm (stacked, random stable plot, etc...)
-
-Animation is achieved by these two items working together by having an animation channel.
-
-One complication is that the orientation of the board should face the active player, and this is easily resolved by creating two versions with black/white facing the user. This requires Adama to emit a *is_play_white* field along with a boolean card selector to pick between "player_black_board" or "player_white_board".
-
-### Hearts
-
-Hearts is fantastic trick taking game which can be broken down to simply your hand, cards in play, your points, and then a count of cards per other player. Adama would need to provide an array of cards in your hand (as *hand*), an array of cards in play (*in_play*), an array of other players with their card counts (*others*) which is sorted per play to the next three players.
-
-Drawing the cards in hand or in play is a simple task of mapping a container item with a layout algorithm (*hand* would use a stacked left to right while *in_play* would use a circular layout with a minimum count) to visualize the cards shown.
-
-Drawing a player would be a repeated container which accepts the count and then renders the card with a layout algorithm.
-
-A core complication of this data invention is that animation is much harder as there is no id to track (for privacy reasons). Worse, we can't infer any animation status from the numbers changing or not. Adama will need to produce a flow table. The repeated container would need to listen to a *card_flow* array with three fields (id_from, id_to, count). Ideally, count will monotonically go up.
-
-### Dominion
-
-In the base game, dominion is a bunch of cards. There are 17 supply piles (three victory cards, three money cards, a curse pile, and ten kingdom cards) which Adama would supply to the user via a count. The player has a deck, their active hand, a discard pile, and a play area. The deck would private to everyone and Adama would supply a counter. The discard pile is also a counter with the top card revealed. The hand is only visible to the player, but it could be revealed due to some actions.
-
-There is also a shared trash pile.
-
-### Monopoly
-
-### Risk
-
-### Battlestar Galatica
+* How are items positioned? [see layout engine](#layout-engine)
+* How are items drawn? [see item drawing](#item-drawing)
+* How we handle multiplicity (i.e. multiple dynamic objects)? [see containers](#containers) 
 
 
+## Layout engine
 
+Fundamentally, the items with a card use a box model which begs the question of how the box is defined.
 
+### The card's size, growth, and tracking lines
 
+A card is a box that has been cut up via tracking lines. For example, the minimal example had:
 
-
-
-### Layout engine
-
-A card uses a box-model
-
-* pixel grid
-* anchoring
-* card slices
-* matrix vs aligned box
-
-
-### Simple shape
-This is primarily a test shape for the developers
-
-### Plot
-Plot an asset (movies)
-
-### Switch
-Read the JSON tree, and then pick a card based on a value
-
-### If
-Read the JSON tree and evaluate a statement, and pick a card based on true/false
-
-## Decide
-
-### Child
-
-## Containers &amp Layout options
-
-* stack {left, right, top, bottom} to {right, left, bottom, top}
-* plot {top, bottom} to {bottom, top}, then {left, right} to {right, left}
-* plot {left, right} to {right, left}, then {top, bottom} to {bottom, top}
-
-## Systems
-
-The l-system will produce a scene tree, but an important aspect of *online* board games is animation which requires branches within the tree to migrate. With Adama, the required information to tween is not available out of the box and requires the infrastructure to provide hints. There are two mechanisms for providing hints: implicit inference and explicit instruction.
-
-**Implicit inference** requires roslin to detect a radical position change of a item by an id. That is, a card disappeared from "in hand" and showed up "in play" which requires global tracking of items by id to smoothly tween the location of the card. Unfortunately, this has problems when the privacy of the card makes that impossible.
-
-**Explicit instruction** requires the back-end to provide some hints as to what to animate. Rather than implicitly detecting a migration, the system has to be told to "move a card from 'in play' to 'discard'"
-
-The key boundary is privacy which requires explicit instruction as information is simply hidden. The back-end must explicitly model the private flow of information. Consider the case of a player passing a card to another player. In a real game, the moment the decision is made, the card is face down for all players.
-
-
-
-### Notes on animation
-This is accomplished via systems which provide tracking of branches that can be mounted within the l-system tree. This is a solution to a problem that emerges from the reactive binding and deck builders, so it's worth taking a look at the nature of the problem.
-
-In a deck builder, like [Dominion](https://en.wikipedia.org/wiki/Dominion_(card_game)), cards are all over the place. There are cards in the supply, trash piles, your hand, your discard, your deck, in play, in reserve, etc. There are many places that a specific card can be, and when a card changes between places we need a way to smoothly animate that changes. This is exceptionally interesting as we also aim to maximize privacy. This problem crops up because Adama encourages developers to expose the various piles of cards as fields.
-
-```adama
-  public formula in_play = iterate cards where location == Location::InPlay:
-  bubble hand = iterate cards where owner == @who && location == Location::Hand:
-  bubble deck_remaining = (iterate cards where owner == @who && location == Location::Deck).size();
-  bubble discard_count = (iterate cards where owner == @who && location == Location::Discard).size();
-  public formula trash_count = (iterate cards where location == Location::Trash).size();
+```js
+  "x": [0, 400],
+  "y": [0, 300],
 ```
 
-The player will only see cards while in hand or in play, but cards in hand may be played, discarded, or trashed. The unfortunate aspect of Adama is that the behavior is instant. Trashing a card from hand will instantly remove the card from hand and increment trash_count. Similarly, discarding will product an instantaneous effect. Ultimately, we need Adama to be able to provide some kind of data to tween between game states. One problem at hand is that this tweening must be privacy centric, so card ids can't be in play as that reveals the nature of the card.
+which indicates the card is cut by x=0, x=400 and y=0, y=300. These numbers are fixed within the design space. When a card is actually drawn, it may be drawn in a larger container (but never smaller). The design space allows items to be transformed into the larger container, and the tracking lines define a coordinate system for that transformation.
 
-The privacy needs create a divide between implicit animation detection (this card identified by card id went from "hand" to "in play") versus explicit animation instruction (a card went from "hand" to "trash"). The beauty of implicit animation detection is a global tracking system can smoothly move cards between binding sites, but the downside of detecting where a card that "disappears" is impossible without extra information. Thus, it is a requirement that the server side provide additional information, and ideally we make this information as easy as possible to get without violating privacy.
+For example, instead of thinking of (x, y) from the (left, top) corner of the card. We aim to think ([0, x], [0, y]) to track the offset (x, y) from the 0'th (i.e left) x-tracking line and 0'th (i.e. top) y-tracking line. For example, this allows us to track the right border of a card via ([1, -17], [0, 10]) represents the point from the right-top corner down. Should the right border move, this point will move with it.
+
+Since the tracking lines are arrays, this implies that a card may have multiple tracking lines. A tracking line is either fixed-offset or relative-offset. By default, all values are relative-offset. We denote a fixed offset by changing the number into an object of the form
+
+```js
+  "x": [0, {"v":50,"mode":"fixed"}, 400],
+  "y": [0, 300],
+```
+
+The x=50 line is fixed which means that as the card is resized, nothing happens between (0, 50) on the x axis. By contrast, a relative offset (the default)
+
+```js
+  "x": [0, 200, 400],
+  "y": [0, 300],
+```
+
+Would be stretched with the card. If the card is in an environment that is 1000 pixels wide, then the right design line of x=400 is transformed into x'=1000 while the design line of x=200 becomes x'=500.
+
+Besides a card rendering in a larger space, items may grow which extend the size of the card as well. For example, this allows for cards to have scrollable text. This means the tracking lines are used to determine how items grow. The sequence of events for rendering are: (1) seed the sizes from the design space, (2) stretch the design space into the rendering space, (3) grow the rendering space for each item.
+
+The order in which items grow the card's rendering is important to consider as changing the tracking lines change may change the dimensions of a previous item sizes. For example, suppose we have a container that lists square boxes from top to bottom and left to right. The height of this container depends on the width of the container, and if another item changes the width then the height changes.
+
+*hard problem inbound, need to figure out how to prove this*
+This creates a topological ordering, and we seek to topologically sort the items during sizing to eliminate back-tracking. This requires an item to fit one of three categorizations: does not expand, expands horizontally, expands vertically.
+
+
+
+### matrix
+
+A 'matrix' layout is limited in many ways. A matrix based layout is unable to push the tracking lines, scale non-uniformaly. However, the matrix layout can rotate. We start with an example:
+
+```js
+{
+    'matrix': {
+        a: 1.0,
+        b: 0.0,
+        c: 0.0,
+        d: 1.0,
+        e: 10.0, // x
+        f: 17.0, // y
+        track: [0, 0],
+        w: 40,
+        h: 30,
+        scale: [0, 0],
+    }
+}
+```
+
+The homogeneous transformation matrix is defined via:
+
+| a | c | e |
+| b | d | f |
+| 0 | 0 | 1 |
+
+The width and height are defined via (w, h). The track field is responsible for defining the origin in terms of the tracking lines.
+
+Resizing a matrix is tricky... *TODO*
+
+### aabb
+
+The 'aabb' mode is more interesting whilst eliminating rotation. We start with an example:
+
+```js
+{
+    'aabb': {
+        left: [0, 10],
+        top: [0, 17],
+        width: 100,
+        height: 150,
+    }
+}
+```
+
+Here, the layout is to associate the box's edged with the tracking lines. In this example, we track the left and top edges to (10, 17) with a dimensions of (100, 150). This is the easiest mode to understand.
+
+## Item drawing
+
+## Containers
+
+
