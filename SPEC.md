@@ -17,6 +17,8 @@ This document outlines the specification for [roslin](https://github.com/mathgla
 
 This runtime should extend beyond board games, but this is the path towards madness. The initial version should be 100% focused on board games and the challenges presented by them. Focus!
 
+There may be some interesting gaming experiences beyond board games, and those will be considered in good time. Regarding expanding beyond games, this is a hard non-goal as HTML and the web are a better fit.
+
 Furthermore, the runtime should adapt into non-2D surfaces like VR/AR, but this is beyond this document’s scope.
 
 # Format
@@ -25,11 +27,11 @@ Roslin is plain-ole JSON structured under a schema that we will describe as this
 
 ## Top level
 
-The root object has many fields: assets, search, forest, default, channels, and more. These root fields will be defined throughout the document.
+The roslin schema starts with a singular root object. The root object has many fields: assets, search, forest, default, channels, and more. These root fields will be defined throughout the document.
 
 ## Assets
 
-The root field "assets" is an object providing a mapping of names (i.e. asset ids) to assets which the system can pre-load. An asset is an object with a required "url" string field, and "url" represents a file like an image, movie, svg, audio, nine-path image, etc. The "url" identifies the location of the asset's resource and may point to an online resource via HTTP or a local resource (using relative pathing). For convenience, an optional top level field called "search" provides an array to provide the runtime a path to search for the resources. The "url" must contain an extension to indicate the nature (image, animation, movie, audio) of the resource.
+The root field "assets" is an object providing a mapping of names (i.e. asset ids) to assets which the system can pre-load. An asset is an object with a required "url" string field, and "url" represents a file like an image, movie, svg, audio, nine-patch image, etc. The "url" identifies the location of the asset's resource and may point to an online resource via HTTP or a local resource (using relative pathing). For convenience, an optional top level field called "search" provides an array to provide the runtime a path to search for the resources. The "url" must contain an extension to indicate the nature (image, animation, movie, audio) of the resource.
 
 Beyond mapping asset ids to files, the asset object is an opportunity to provide parameters on how that particular asset is to be used. For example, a nine-patch image requires four integer values as to how to slice the image up to scale. Similarly, a set of assets may share a file with different parameters so tile-maps and an image atlas may be used.
 
@@ -50,7 +52,7 @@ Beyond mapping asset ids to files, the asset object is an opportunity to provide
 
 Roslin uses an [l-system](https://en.wikipedia.org/wiki/L-system) inspired approach where you have a forest of cards. Cards are simply functions that turn JSON into a scalable image. The root field "forest" is an object mapping names (i.e. card ids) to cards. A card is an object with parameters and instructions on how to pull data from JSON, draw it, and map any feedback. 
 
-First, a card has a "x" and "y" boundaries which are in pixel units; boundaries will be explained in [the below section in layout](#layout-engine), but both x and y are arrays where the final element is width and height, respectively.
+First, a card has a "x" and "y" tracking lines which are in pixel units; tracking lines will be explained in [the below section in layout](#layout-engine), but both x and y are arrays where the final element is width and height, respectively. The below example has dimensions of 400 pixels by 300 pixels.
 
 Second, the card also has a field called "items" which is a array of items. An item is an object which is a dynamically typed object that is determined on the fly.
 
@@ -58,7 +60,7 @@ An item fundamentally uses ideas inspired from [entity component systems](https:
 
 For example, an item may have a field called 'shape' will which indicate the item will render a shape. The 'shape' object has at least three parameters: "shape", "stroke", "fill" which sit inside the object. More details can be found in the later sections, but we will set "shape" to "box" to render a box with stroke set to "#000" and fill set to "#fff". This will render a white box with a black border.
 
-An item may also have a field called matrix which will define how to position and size the box. The defaults of this will be outlined in the [layout engine](#layout-engine) section.
+An item may also have a field called 'matrix' which will define how to position and size the box. The defaults of this will be outlined in the [layout engine](#layout-engine) section.
 
 We give this card the name "simple-white-box", and then use the top-level field "default" to set this card as the root card.
 
@@ -90,8 +92,8 @@ This minimal example will render a white box. This sets the stage for more detai
 
 * How are items positioned? [see layout engine](#layout-engine)
 * How are items drawn? [see item drawing](#item-drawing)
+* How do we handle data binding? [see data binding](#data-binding)
 * How we handle multiplicity (i.e. multiple dynamic objects)? [see containers](#containers) 
-
 
 ## Layout engine
 
@@ -108,7 +110,7 @@ A card is a box that has been cut up via tracking lines. For example, the minima
 
 which indicates the card is cut by x=0, x=400 and y=0, y=300. These numbers are fixed within the design space. When a card is actually drawn, it may be drawn in a larger container (but never smaller). The design space allows items to be transformed into the larger container, and the tracking lines define a coordinate system for that transformation.
 
-For example, instead of thinking of (x, y) from the (left, top) corner of the card. We aim to think ([0, x], [0, y]) to track the offset (x, y) from the 0'th (i.e left) x-tracking line and 0'th (i.e. top) y-tracking line. For example, this allows us to track the right border of a card via ([1, -17], [0, 10]) represents the point from the right-top corner down. Should the right border move, this point will move with it.
+For example, instead of thinking of (x, y) from the (left, top) corner of the card. We aim to think ([0, x], [0, y]) to track the offset (x, y) from the 0'th (i.e left) x-tracking line and 0'th (i.e. top) y-tracking line. For example, this allows us to track the right border of a card via ([1, -17], [0, 10]) represents the point from the right-top corner down. Should the right tracking line move, this point will move with it.
 
 Since the tracking lines are arrays, this implies that a card may have multiple tracking lines. A tracking line is either fixed-offset or relative-offset. By default, all values are relative-offset. We denote a fixed offset by changing the number into an object of the form
 
@@ -126,18 +128,15 @@ The x=50 line is fixed which means that as the card is resized, nothing happens 
 
 Would be stretched with the card. If the card is in an environment that is 1000 pixels wide, then the right design line of x=400 is transformed into x'=1000 while the design line of x=200 becomes x'=500.
 
-Besides a card rendering in a larger space, items may grow which extend the size of the card as well. For example, this allows for cards to have scrollable text. This means the tracking lines are used to determine how items grow. The sequence of events for rendering are: (1) seed the sizes from the design space, (2) stretch the design space into the rendering space, (3) grow the rendering space for each item.
+Besides a card rendering in a larger space, items may grow which extend the size of the card as well. For example, this allows for cards to have scrollable text. This means the tracking lines are used to determine how items grow. The sequence of events for rendering are: (1) seed the sizes from the design space, (2) stretch the design space into the rendering space, (3) grow the rendering space for each item by adjusting the tracking lines.
 
-The order in which items grow the card's rendering is important to consider as changing the tracking lines change may change the dimensions of a previous item sizes. For example, suppose we have a container that lists square boxes from top to bottom and left to right. The height of this container depends on the width of the container, and if another item changes the width then the height changes.
+The order in which items grow the card's rendering is important to consider as changing the tracking lines change may change the dimensions of a previous item sizes. Resizing and dependency tracking will discussed in [aabb](#aabb). For now, the key is that an item and card negotiate the item's size and the coordinate system as defined by tracking lines.
 
-*hard problem inbound, need to figure out how to prove this*
-This creates a topological ordering, and we seek to topologically sort the items during sizing to eliminate back-tracking. This requires an item to fit one of three categorizations: does not expand, expands horizontally, expands vertically.
-
-
+At hand, there are two ways for an item to size and position themselves. The simple case is a ['matrix'](#matrix) while the more interesting case is ['aabb'](#aabb).
 
 ### matrix
 
-A 'matrix' layout is limited in many ways. A matrix based layout is unable to push the tracking lines, scale non-uniformaly. However, the matrix layout can rotate. We start with an example:
+A 'matrix' layout is a limited way to size and position an item, but it is also the simplest and supports rotation. This layout algorithm is unable to influence tracking lines, and is primarily meant as a way to rotate perspectives or place doodads. We start with an example:
 
 ```js
 {
@@ -151,20 +150,21 @@ A 'matrix' layout is limited in many ways. A matrix based layout is unable to pu
         track: [0, 0],
         w: 40,
         h: 30,
-        scale: [0, 0],
+        scale: [[0, 0], [1,1],
     }
 }
 ```
 
 The homogeneous transformation matrix is defined via:
+| row/col | col 1 | col 2 | col 3 |
+| --- | --- | --- | --- |
+| row 1 | a | c | e |
+| row 2 | b | d | f |
+| row 3 | 0 | 0 | 1 |
 
-| a | c | e |
-| b | d | f |
-| 0 | 0 | 1 |
+The width and height are defined via (w, h). The track field is responsible for defining the origin in terms of the tracking line coordinate system. Here, the origin is defined as the top left most point (x=0 and y=0).
 
-The width and height are defined via (w, h). The track field is responsible for defining the origin in terms of the tracking lines.
-
-Resizing a matrix is tricky... *TODO*
+Resizing is done via the scale parameter which defines a box using tracking line coordinates to monitor. A value of *null* would indicate no resizing available. In the example, the box defined by the left-top coordinate (x=0, y=0) and right-bottom coordinate (x=400,y=300). This means that if the width and height will resize uniformly to preserve aspect ratio of the item. For example, if the render size is (600, 400) then the ratio used = min(600/400, 400/300) = 1.3.
 
 ### aabb
 
@@ -181,10 +181,40 @@ The 'aabb' mode is more interesting whilst eliminating rotation. We start with a
 }
 ```
 
-Here, the layout is to associate the box's edged with the tracking lines. In this example, we track the left and top edges to (10, 17) with a dimensions of (100, 150). This is the easiest mode to understand.
+Here, the layout will associate the box's edges with the tracking lines. In this example, we track the left and top edges to (10, 17) with a dimensions of (100, 150). This is the easiest mode to understand. 'aabb' can also track both left and right. For example, 
+
+```js
+{
+    'aabb': {
+        left: [0, 10],
+        top: [0, 17],
+        right: [1, -10],
+        height: 150,
+    }
+}
+```
+
+Here, the width is determined by maintaining a fixed distance between the x=0 and x=400 lines. This allows a great deal of options in anchoring items within and across tracking lines. 
+
+Since the 'aabb' is axis aligned with the card, the 'aabb' mode can also resize the hosting card by pushing the right and bottom tracking lines out accordingly. There are 'horizontal' and 'vertical' fields with values: 'clip', 'scroll', 'expand'. For 'clip' and 'scroll', the item's size does not influence the associated right or bottom tracking lines. When the value is 'expand', the line will be pushed such that the size is increased to fit the content.
+
+This begs a question of how items will expand, and we first must talk about [data binding](#data-binding) and [containers](#containers). Regardless of how the items expand, the ability to items to expand the parent create a topological dependency tracking problem.
+
+#### Dependency tracking
+
+For example, suppose we have a container that lists square boxes from top to bottom and left to right. The height of this container depends on the width of the container, and if another item changes the width then the height changes.
+
+This creates a hard problem requiring item sizing to be topologically ordered to minimize back-tracking resize computations. For example, if the last item resizes the entire card and the first few items depended on the width of the card then they require their sizes to be computed again.
+
+## Data binding
+
+
+## Containers
+
 
 ## Item drawing
 
-## Containers
+
+
 
 
