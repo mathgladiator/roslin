@@ -21,6 +21,10 @@ There may be some interesting gaming experiences beyond board games, and those w
 
 Furthermore, the runtime should adapt into non-2D surfaces like VR/AR, but this is beyond this document’s scope.
 
+# The critical game we are playing.
+
+This design document is playing a game of how do I take data and turn it into an interactive image. This means there are several critical questions to answer. How to pick and select content to draw? How do I position and orientate that drawn content? How do make that content interactive? How do animate the drawn content? How do I make the content depend on data?
+
 # Format
 
 Roslin is plain-ole JSON structured under a schema that we will describe as this document unfolds.
@@ -156,7 +160,7 @@ A 'matrix' layout is a limited way to size and position an item, but it is also 
 ```
 
 The homogeneous transformation matrix is defined via:
-| row/col | col 1 | col 2 | col 3 |
+| row\col | col 1 | col 2 | col 3 |
 | --- | --- | --- | --- |
 | row 1 | a | c | e |
 | row 2 | b | d | f |
@@ -194,7 +198,7 @@ Here, the layout will associate the box's edges with the tracking lines. In this
 }
 ```
 
-Here, the width is determined by maintaining a fixed distance between the x=0 and x=400 lines. This allows a great deal of options in anchoring items within and across tracking lines. 
+Here, the width is determined by maintaining a fixed distance between the x=0 and x=400 lines. This allows a great deal of options in anchoring items within and across tracking lines. This mirrors and old school anchoring where tracking lines replace edges.
 
 Since the 'aabb' is axis aligned with the card, the 'aabb' mode can also resize the hosting card by pushing the right and bottom tracking lines out accordingly. There are 'horizontal' and 'vertical' fields with values: 'clip', 'scroll', 'expand'. For 'clip' and 'scroll', the item's size does not influence the associated right or bottom tracking lines. When the value is 'expand', the line will be pushed such that the size is increased to fit the content.
 
@@ -202,17 +206,109 @@ This begs a question of how items will expand, and we first must talk about [dat
 
 #### Dependency tracking
 
-For example, suppose we have a container that lists square boxes from top to bottom and left to right. The height of this container depends on the width of the container, and if another item changes the width then the height changes.
+Suppose we have a container that lists square boxes from top to bottom and left to right. The height of this container depends on the width of the container, and if another item changes the width then the height changes.
 
-This creates a hard problem requiring item sizing to be topologically ordered to minimize back-tracking resize computations. For example, if the last item resizes the entire card and the first few items depended on the width of the card then they require their sizes to be computed again.
+We start with the hard rule that tracking lines only monotonically expand as this ensures everything will fit eventually, and our goal is to order the items to be sized such that need to back-track and recompute previous sized items is minimized. For example, if the last item resizes the entire card and the first few items depended on the width of the card then they require their sizes to be computed again.
+
+Thus, we need to topologically sort the items by their dependencies. We can think about several associations between items and tracking lines.
+
+* Read(itemId, x|y, trackingLineId)
+* Write(itemId, x|y, trackingLineId)
+* Free(itemId, x|y)
+
+And then we need to order these associates such that Write happen before Read, and Free can happen anywhere because they cost nothing. The axis which the associates operate are independent which means cycles can happen.
+
+For example, an item may read x and write y while another item may write x and read y; these cycles are why the tracking line must only expand out so writes become idempotent. Since cycles exist, we must therefore backtrack when we detect a change which is why the writes must occur first.
 
 ## Data binding
 
+The roslin document sits as a stateless function with two sources of data available: view state and server state. The view state is ephemeral and includes things like 'currently selected tab' and 'scroll bar positions'. The server state is coming from [Adama as a giant JSON object with JSON deltas](https://book.adama-platform.com/reference/deltas.html).
+
+The roslin runtime will mirror [RxHTML](https://book.adama-platform.com/rxhtml/ref.html) with the ability to manage multiple server states. It's worth noting that a single item can be bind data to a single server state at a time.
+
+How data gets bound is a aspect centered idea, and we will introduce various answers to this as the document unfolds. We will introduce [branching](#branching) and [containers](#containers)
+
+### Scoping
+
+An item is going to evaluate data binding against an object within the JSON object. There are some implicit rules, but it may be useful to navigate the object more directly.
+
+## Branching
+
+A basic form of data binding is branching on booleans, enumerations, or numeric ranges. This is denoted via the item field 'branch' which contains an object.
+
+The first field within 'branch' is 'bind' which indicates which field to lookup in the JSON object. Based on the type and value of the field, the branch is going to select a card. The 'default' field within the branch object indicates the card id to use when no value was matched.
+
+Branching supports specific values and ranges.
+
+| value | branching rule to match |
+| --- | --- |
+| true | '=true' |
+| false | '=false' |
+| "xyz" | '=xyz' |
+| 1 | '=1' |
+| 2 | '=2' |
+| ... | '=...' |
+| 2.4 | '<2.5>2.3' |
+
+The branching rule is written as a field within the branch object and the associated value is a card id.
 
 ## Containers
 
+A container is fundamentally how an array within the server state gets exposed. For example, a hand of cards is represented as an array in Adama, and roslin will data bind to that array and create instances of cards. The item field 'container' is used to denote the field has children, and the associated object has fields like 'bind' and 'child'. The 'bind' field denotes which array in the JSON object to bind to, and the 'child' is a pointer to a card id used to denote which card is used on each child object.
+
+ The multiplicity requires some kind of layout algorithm. For example, a hand of cards could use a "stack left to right" layout algorithm.
+
+Each algorithm supports up to two directions. A direction goes from one edge of the container to the opposite. We further classify each direction as either horizontal or vertical.
+
+| direction | type |
+| --- | --- |
+| left-right | horizontal |
+| right-left | horizontal |
+| top-bottom | vertical |
+| bottom-top | vertical |
+
+These directions feed various layout algorithms. The 'layout' field is used to select a specific algorithm:
+
+| 'layout' algorithm | directions | causes growth on overflow |
+| --- |
+| stack | all | yes, in the direction of growth |
+| overlap | all | no |
+| flow | horizontal to vertical, vertical to horizontal | yes, in the minor direction of growth |
+
+The key difference between stack and overlap algorithms is that stack will adjoin the items together edge to edge while overlap will evenly fit the items into the container. The direction is denoted via 'major' field.
+
+The flow layout algorithm has a major direction and minor direction. If the major direction is left to right and the minor direction is top to bottom, then this is the typical western typesetter algorithm. The major direction is held in the 'major' field while the minor direction is held in the 'minor' field.
+
+The sizing of child cards in the container starts with minimum sizing which cards can override. By default, the minimize size of each child card is one pixel by one pixel. The minimum size can be configured to follow from the height or width of a container as well via a variety of rules. This allows the sizing of the container to be communicated to the child cards. The rule is determined by the presence of a field.
+
+| child sizing field | meaning |
+| --- | --- |
+| child-size | fixed size of the child size |
+| child-width-scale-height | The width of the child is a scalar multiplier of the height |
+| child-height-scale-width | The height of the child is a scalar multiplier of the width |
+| child-multiplier | The size of the child is a multiple of the parent |
+
+For example, a hand of cards could be configured via.
+
+```js
+{
+    'container': {
+        'bind': 'hand',
+        'child': 'single-card',
+        'layout': 'overlap',
+        'major': 'left-right',
+        'child-width-scale-height': 0.7,
+    }
+}
+```
 
 ## Item drawing
+
+### Shapes
+
+### Images and SVG
+
+### Text
 
 
 
