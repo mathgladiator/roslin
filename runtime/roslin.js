@@ -12,7 +12,20 @@ Roslin.mksf = function (canvas) {
     }
 };
 
-Roslin.assemble_into = function (assembly, scene) {
+Roslin.assemble_into = function (scene, assembly) {
+    // Assemble into supports merging two scenes into the same assembly.
+    // The first call of assemble_into will seed the parameters within the assembly.
+    if (!('_first' in assembly)) {
+        assembly._first = true;
+        assembly.imgc = {};
+        assembly.imgw = 0;
+        assembly.imgl = 0;
+        assembly.draw = {};
+    }
+    // events come from the outside
+    if (!('on_progress' in assembly)) {
+        assembly.on_progress = function(completed, total, done) {};
+    }
 
     /* helper: Pull a field from an object using multiple field names
      * 
@@ -37,7 +50,7 @@ Roslin.assemble_into = function (assembly, scene) {
         self.f = pull(parameters, ['fill', 'f']);
         var shape = pull(parameters, ['shape', 'h']);
         if (shape == 'box') {
-            self.D = function (/* forest, */ instance, surface, w, h) {
+            self.D = function (instance, surface, w, h) {
                 var self = this;
                 if (self.f !== null) {
                     surface.context.fillStyle = self.f;
@@ -53,11 +66,11 @@ Roslin.assemble_into = function (assembly, scene) {
         return self;
     };
 
-    var assemble_draw_compound = function (arr, root) {
+    var assemble_draw_compound = function (arr) {
         var self = {};
         self.c = [];
         for (var k = 0; k < arr.length; k++) {
-            self.c[k] = assemble_draw(arr[k], root);
+            self.c[k] = assemble_draw(arr[k]);
         }
         self.D = function (instance, surface, w, h) {
             var self = this;
@@ -70,24 +83,24 @@ Roslin.assemble_into = function (assembly, scene) {
         return self;
     };
 
-    var assemble_draw = function (item, root) {
-        if ('shape' in item) {
-            return assemble_draw_shape(item['shape']);
-        }
+    var assemble_draw = function (item) {
         if ('asset' in item) {
             var asset_id = item['asset'];
-            if (asset_id in root.draw) {
-                return root.draw[asset_id];
+            if (asset_id in assembly.draw) {
+                return assembly.draw[asset_id];
             }
             // TODO: return a default 'invalid texture'
         }
+        if ('shape' in item) {
+            return assemble_draw_shape(item['shape']);
+        }
         if ('compound' in item) {
-            return assemble_draw_compound(item['compound'], root);
+            return assemble_draw_compound(item['compound']);
         }
         return null;
     };
 
-    var assemble_transform = function (item, card, root) {
+    var assemble_transform = function (item, card) {
         if ('matrix' in item) {
 
         } else if ('aabb' in item) {
@@ -97,22 +110,12 @@ Roslin.assemble_into = function (assembly, scene) {
         }
     };
 
-    assembly.imgc = {};
-    assembly.imgw = 0;
-    assembly.imgl = 0;
-    assembly.draw = {};
-
     var is_image = function (url) {
         if (url.endsWith('.png')) return true;
         if (url.endsWith('.jpg')) return true;
         if (url.endsWith('.svg')) return true;
         return false;
     };
-
-    if (!('on_progress' in assembly)) {
-        assembly.on_progress = function(completed, total, done) {
-        };
-    }
 
     // build the image cache and asset drawing functions
     for (var asset_id in scene.assets) {
@@ -155,8 +158,8 @@ Roslin.assemble_into = function (assembly, scene) {
         made._draw = [];
         for (var k = 0; k < n; k++) {
             var item = items[k];
-            var transform = assemble_transform(item, made, assembly);
-            var draw = assemble_draw(item, assembly);
+            var transform = assemble_transform(item, made);
+            var draw = assemble_draw(item);
         }
         made.update = function (instance, globals) {
 
