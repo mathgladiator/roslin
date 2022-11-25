@@ -19,6 +19,8 @@ This runtime should extend beyond board games, but this is the path towards madn
 
 There may be some interesting gaming experiences beyond board games, and those will be considered in good time. Regarding expanding beyond games, this is a hard non-goal as HTML and the web are a better fit.
 
+It is also not the goal to compete with HTML/CSS, and this means that accessibility is also not a strict goal.
+
 Furthermore, the runtime should adapt into non-2D surfaces like VR/AR, but this is beyond this document’s scope.
 
 # The critical game we are playing.
@@ -145,16 +147,16 @@ A 'matrix' layout is a limited way to size and position an item, but it is also 
 ```js
 {
     'matrix': {
-        a: 1.0,
-        b: 0.0,
-        c: 0.0,
-        d: 1.0,
-        e: 10.0, // x
-        f: 17.0, // y
-        track: [0, 0],
-        w: 40,
-        h: 30,
-        scale: [[0, 0], [1,1],
+        "a": 1.0,
+        "b": 0.0,
+        "c": 0.0,
+        "d": 1.0,
+        "e": 10.0, // x
+        "f": 17.0, // y
+        "track": [0, 0],
+        "w": 40,
+        "h": 30,
+        "scale": [[0, 0], [1,1],
     }
 }
 ```
@@ -177,10 +179,10 @@ The 'aabb' mode is more interesting whilst eliminating rotation. We start with a
 ```js
 {
     'aabb': {
-        left: [0, 10],
-        top: [0, 17],
-        width: 100,
-        height: 150,
+        "left": [0, 10],
+        "top: [0, 17],
+        "width": 100,
+        "height": 150,
     }
 }
 ```
@@ -190,10 +192,10 @@ Here, the layout will associate the box's edges with the tracking lines. In this
 ```js
 {
     'aabb': {
-        left: [0, 10],
-        top: [0, 17],
-        right: [1, -10],
-        height: 150,
+        "left": [0, 10],
+        "top": [0, 17],
+        "right": [1, -10],
+        "height": 150,
     }
 }
 ```
@@ -232,9 +234,22 @@ How data gets bound is a aspect centered idea, and we will introduce various ans
 
 An item is going to evaluate data binding against an object within the JSON object. There are some implicit rules, but it may be useful to navigate the object more directly.
 
+## Indirection
+
+An item may be another card. Here, an item containing an 'indirect' card will recurse into another card within the given bounds for the item.
+
+```js
+{
+    "indirect": 'other-card-id'
+}
+```
+
+This can create interesting recursive problems, and it's worth nothing that the stack depth is limited to 128.
+
+
 ## Branching
 
-A basic form of data binding is branching on booleans, enumerations, or numeric ranges. This is denoted via the item field 'branch' which contains an object.
+A basic form of data binding is branching on booleans, enumerations, string values, or numeric ranges. This is denoted via the item field 'branch' which contains an object.
 
 The first field within 'branch' is 'bind' which indicates which field to lookup in the JSON object. Based on the type and value of the field, the branch is going to select a card. The 'default' field within the branch object indicates the card id to use when no value was matched.
 
@@ -251,6 +266,8 @@ Branching supports specific values and ranges.
 | 2.4 | '<2.5>2.3' |
 
 The branching rule is written as a field within the branch object and the associated value is a card id.
+
+*TODO: parsing the string may be a bad idea: instead, don't*
 
 ## Containers
 
@@ -306,11 +323,30 @@ For example, a hand of cards could be configured via.
 
 ### Shapes
 
-### Images and SVG
+* box
+* oval
+* hexagon
+
+### Assets: Images and SVG
+
+* asset
 
 ### Text
 
+* text (static text)
+* bind (direct text from document)
+* template (a string template pulling from the document)
 
+### Container layering
 
+* front
+* back
 
+## Animation behaviors
 
+* flow-source
+* flow-target
+* attract-target
+
+## Interactivity and decisions
+At core, Roslin allows items to be clicked/tapped to decide events.
