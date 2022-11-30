@@ -5,12 +5,209 @@ Roslin.mksf = function (canvas) {
     var surface = {};
     surface.canvas = canvas;
     if (canvas.getContext) {
-        surface.context = canvas.getContext('2d');
+        surface.ctx = canvas.getContext('2d');
+        surface.w = canvas.width;
+        surface.h = canvas.height;
+        // TODO: better DOM lookups for width and height
         return surface;
     } else {
         throw new Error("Either <canvas>.getContext is not supported, or provided element not a canvas");
     }
 };
+
+/*
+  var get_connection_obj = function (name) {
+    if (name in connections) {
+      return connections[name];
+    } else {
+      var obj = {
+        name: name,
+        ptr: null,
+        tree: new AdamaTree(),
+        outstanding: {},
+        decisions: {},
+        choice_subs: {},
+        resets: {},
+        connection_events: {},
+        id: 0,
+        connection_state: false,
+        choices: {},
+      };
+      obj.set_connected = function(cs) {
+        if (this.connection_state == cs) {
+          return;
+        }
+        this.connection_state = cs;
+        var axe = [];
+        for (var sub in obj.connection_events) {
+          if (!(obj.connection_events[sub](cs))) {
+            axe.push(sub);
+          }
+        }
+        for (var k = 0; k < axe.length; k++) {
+          delete obj.connection_events[axe[k]];
+        }
+      }.bind(obj);
+      obj.connected = function(callback) {
+        var s = "-|" + this.id++;
+        this.connection_events[s] = callback;
+        callback(this.connection_state);
+        return function () {
+          delete this.connection_events[s];
+        }.bind(this);
+      }.bind(obj);
+      obj.subscribe_any = function(callback) {
+        var s = "-|" + this.id++;
+        this.decisions[s] = callback;
+        return function () {
+          delete this.decisions[s];
+        }.bind(this);
+      }.bind(obj);
+      obj.subscribe = function (channel, callback) {
+        var s = channel + "|" + this.id++;
+        this.decisions[s] = callback;
+        return function () {
+          delete this.decisions[s];
+        }.bind(this);
+      }.bind(obj);
+      obj.subscribe_reset = function(callback) {
+        var dr = "reset|" + this.id++;
+        this.resets[dr] = callback;
+        return function () {
+          delete this.resets[dr];
+        }.bind(this);
+      }.bind(obj);
+      obj.subscribe_choice = function (channel, callback) {
+        var s = channel + "|" + this.id++;
+        this.choice_subs[s] = callback;
+        return function () {
+          delete this.choice_subs[s];
+        }.bind(this);
+      }.bind(obj);
+      obj.onchoices = function(channel, choice) {
+        var axe = [];
+        for (var sub in obj.choice_subs) {
+          if (sub.startsWith(channel + "|")) {
+            if (!obj.choice_subs[sub](choice)) {
+              axe.push(sub);
+            }
+          }
+        }
+        for (var k = 0; k < axe.length; k++) {
+          delete obj.choice_subs[axe[k]];
+        }
+      };
+      obj.ondecide = function (outstanding) {
+        var axeReset = [];
+        for (var dr in obj.resets) {
+          var r = obj.resets[dr];
+          if (!(r())) {
+            axeReset.push(dr);
+          }
+        }
+        for (var k = 0; k < axeReset.length; k++) {
+          delete obj.resets[axeReset[k]];
+        }
+        for (var ch in obj.outstanding) {
+          obj.outstanding[ch] = {options: []};
+        }
+        var n = outstanding.length;
+        for (var k = 0; k < n; k++) {
+          var o = outstanding[k];
+          obj.outstanding[o.channel] = o;
+        }
+        for (var ch in obj.outstanding) {
+          var out = obj.outstanding[ch];
+          var axe = [];
+          for (var sub in obj.decisions) {
+            if (sub.startsWith(ch + "|") || sub.startsWith("-|")) {
+              if (!obj.decisions[sub](out, ch)) {
+                axe.push(sub);
+              }
+            }
+          }
+          for (var k = 0; k < axe.length; k++) {
+            delete obj.decisions[axe[k]];
+          }
+        }
+      };
+      connections[name] = obj;
+      return obj;
+    }
+  };
+
+
+  var subscribe = function (state, name, sub) {
+    var ss = self.pI(state, name);
+    var s = ss[ss.current];
+    if ("@e" in s.delta) {
+      s.delta["@e"].push(sub);
+    } else {
+      s.delta["@e"] = [sub];
+    }
+  };
+
+  var fresh = function (where) {
+    return {
+      tree: new AdamaTree(),
+      delta: {},
+      parent: null,
+      path: null,
+      where: where
+    };
+  };
+
+
+  var root_of = function (ss) {
+    var x = ss;
+    while (x.parent != null) {
+      x = x.parent;
+    }
+    return x;
+  };
+
+  var path_to = function (ss, obj) {
+    if (ss.parent != null) {
+      var parent = path_to(ss.parent, {});
+      parent[ss.path] = obj;
+      return parent;
+    } else {
+      return obj;
+    }
+  };
+
+  var new_delta_copy = function (ss) {
+    if (ss == null) {
+      return null;
+    }
+    var parent = null;
+    if (ss.parent != null) {
+      parent = new_delta_copy(ss.parent);
+    }
+    var new_delta = {};
+    if (parent != null) {
+      parent.delta[ss.path] = new_delta;
+    }
+    return {tree: ss.tree, parent: parent, delta: new_delta, path: ss.path};
+  };
+
+
+ */
+
+    /*
+    var state = {
+        service: null,
+        data: {connection: co, tree: co.tree, delta: {}, parent: null, path: null},
+        view: new_delta_copy(priorState.view),
+        current: "data"
+      };
+      */
+
+
+Roslin.fresh = function(connection) {
+
+    return {};
+}
 
 Roslin.assemble_into = function (scene, assembly) {
     // Assemble into supports merging two scenes into the same assembly.
@@ -21,10 +218,15 @@ Roslin.assemble_into = function (scene, assembly) {
         assembly.imgw = 0;
         assembly.imgl = 0;
         assembly.draw = {};
+        assembly.make = {};
     }
     // events come from the outside
     if (!('on_progress' in assembly)) {
-        assembly.on_progress = function(completed, total, done) {};
+        assembly.on_progress = function (completed, total, done) { };
+    }
+    // assume a default root
+    if ('default' in scene && !('root' in assembly)) {
+        assembly.root = scene['default'];
     }
 
     /* helper: Pull a field from an object using multiple field names
@@ -50,20 +252,19 @@ Roslin.assemble_into = function (scene, assembly) {
         self.f = pull(parameters, ['fill', 'f']);
         var shape = pull(parameters, ['shape', 'h']);
         if (shape == 'box') {
-            self.D = function (instance, surface, w, h) {
+            return function (surface) {
                 var self = this;
                 if (self.f !== null) {
-                    surface.context.fillStyle = self.f;
-                    surface.context.fillRect(0, 0, w, h);
+                    surface.ctx.fillStyle = self.f;
+                    surface.ctx.fillRect(0, 0, surface.w, surface.h);
                 }
                 if (self.s !== null) {
-                    surface.context.strokeStyle = self.s;
-                    surface.context.strokeRect(0, 0, w, h);
+                    surface.ctx.strokeStyle = self.s;
+                    surface.ctx.strokeRect(0, 0, surface.w, surface.h);
                 }
             }.bind(self);
         }
-        // TODO: more shapes
-        return self;
+        return function (surface) { };
     };
 
     var assemble_draw_compound = function (arr) {
@@ -72,15 +273,14 @@ Roslin.assemble_into = function (scene, assembly) {
         for (var k = 0; k < arr.length; k++) {
             self.c[k] = assemble_draw(arr[k]);
         }
-        self.D = function (instance, surface, w, h) {
+        return function (surface) {
             var self = this;
             var c = self.c;
             var n = c.length;
             for (var k = 0; k < n; k++) {
-                c[k].D(instance, surface, w, h);
+                c[k](surface);
             }
         }.bind(self);
-        return self;
     };
 
     var assemble_draw = function (item) {
@@ -89,7 +289,6 @@ Roslin.assemble_into = function (scene, assembly) {
             if (asset_id in assembly.draw) {
                 return assembly.draw[asset_id];
             }
-            // TODO: return a default 'invalid texture'
         }
         if ('shape' in item) {
             return assemble_draw_shape(item['shape']);
@@ -97,12 +296,16 @@ Roslin.assemble_into = function (scene, assembly) {
         if ('compound' in item) {
             return assemble_draw_compound(item['compound']);
         }
-        return null;
+        // TODO: render an invalid draw command, issue a warning?
+        return function (surface) { };
     };
 
-    var assemble_transform = function (item, card) {
-        if ('matrix' in item) {
 
+
+    var assemble_transform = function (item) {
+        if ('matrix' in item) {
+            return function(surface) {
+            };
         } else if ('aabb' in item) {
 
         } else {
@@ -137,37 +340,50 @@ Roslin.assemble_into = function (scene, assembly) {
             }
             var img = assembly.imgc[url];
             // TODO: inspect parameters
-            assembly.draw[asset_id] = {
-                D: function (instance, surface, w, h) {
-                    surface.context.drawImage(this, 0, 0, w, h);
-                }.bind(img)
-            };
+
+            // Nothing special / normal image plot
+            assembly.draw[asset_id] = function (surface) {
+                surface.context.drawImage(this, 0, 0, surface.w, surface.h);
+            }.bind(img);
+
         }
     }
     // TODO: define an async function to wait for the images to load
 
-    assembly.root = scene['default'];
     for (var card_id in scene.forest) {
         var card = scene.forest[card_id];
-        var made = {};
-        made.d_x = card.x;
-        made.d_y = card.y;
+        var factory = {};
+        assembly.make[card_id] = factory;
+        factory.d_x = card.x;
+        factory.d_y = card.y;
+        factory.base = [];
         var items = card.items;
         var n = items.length;
-        made._update = [];
-        made._draw = [];
         for (var k = 0; k < n; k++) {
             var item = items[k];
-            var transform = assemble_transform(item, made);
-            var draw = assemble_draw(item);
+            var base = {};
+            base.idx = k;
+            base.par = factory;
+            factory.base[k] = base;
+            base.t = assemble_transform(item, made);
+            base.d = assemble_draw(item);
         }
-        made.update = function (instance, globals) {
+        // TODO: order the update functions to minimize churn
+        factory.create = function (state) {
+            var self = this;
+            var instance = {};
+            instance.update = function(surface, dt) {
+                var current = {};
+                current.pri = surface.current;
+                surface.cur = current;
+                
+            };
+            instance.draw = function(surface) {
 
-        };
-        made.draw = function (surface, instance) {
-
-        };
+            };
+        }.bind(factory);
     }
+
     return assembly;
 };
 
@@ -181,7 +397,7 @@ Roslin.assemble_into = function (scene, assembly) {
 
 function roslin_demo_setup(canvas) {
     // create a surface
-    var surf = Roslin.mksf(canvas);
+    var surface = Roslin.mksf(canvas);
     // create an email forest
 
     var example = {
@@ -217,7 +433,7 @@ function roslin_demo_setup(canvas) {
         'default': 'demo_card'
     };
     var compiled = {};
-    compiled.on_progress = function(x, n, finished) {
+    compiled.on_progress = function (x, n, finished) {
         console.log(x + "/" + n + "::" + finished);
     };
     Roslin.assemble_into(compiled, example);
