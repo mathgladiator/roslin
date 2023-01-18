@@ -2,7 +2,8 @@
 
 **SUPER DRAFT: spelling nor grammar consults, 100% raw human**
 
-This document outlines the specification for [roslin](https://github.com/mathgladiator/roslin) which is a reactive runtime for board games. Roslin is designed as a UX mirror to [Adama](https://github.com/mathgladiator/adama-lang), and the expectation is that Roslin + Adama = a game.
+This document outlines the specification for [roslin](https://github.com/mathgladiator/roslin) which is a reactive runtime for board games.
+Roslin is designed as a UX mirror to [Adama](https://github.com/mathgladiator/adama-lang), and the expectation is that Roslin + Adama = a game.
 
 **About the name:** [roslin](https://en.wikipedia.org/wiki/Laura_Roslin) is derived from [Battlestar Galatica](https://www.imdb.com/title/tt0407362/) which is how the author and his wife named their goats.
 
@@ -17,15 +18,21 @@ This document outlines the specification for [roslin](https://github.com/mathgla
 
 This runtime should extend beyond board games, but this is the path towards madness. The initial version should be 100% focused on board games and the challenges presented by them. Focus!
 
-There may be some interesting gaming experiences beyond board games, and those will be considered in good time. Regarding expanding beyond games, this is a hard non-goal as HTML and the web are a better fit.
-
+There may be some interesting gaming experiences beyond board games, and those will be considered in good time.
+Regarding expanding beyond games, this is a hard non-goal as HTML and the web are a better fit for apps.
 It is also not the goal to compete with HTML/CSS, and this means that accessibility is also not a strict goal.
 
 Furthermore, the runtime should adapt into non-2D surfaces like VR/AR, but this is beyond this document’s scope.
 
 # The critical game we are playing.
 
-This design document is playing a game of how do I take data and turn it into an interactive image. This means there are several critical questions to answer. How to pick and select content to draw? How do I position and orientate that drawn content? How do make that content interactive? How do animate the drawn content? How do I make the content depend on data?
+This design document is playing a game of how do I take data and turn it into an interactive image.
+This means there are several critical questions to answer.
+How to pick and select content to draw?
+How do I position and orientate that drawn content?
+How do make that content interactive?
+How do animate the drawn content?
+How do I make the content depend on data?
 
 # Format
 
@@ -39,7 +46,9 @@ The roslin schema starts with a singular root object. The root object has many f
 
 The root field "assets" is an object providing a mapping of names (i.e. asset ids) to assets which the system can pre-load. An asset is an object with a required "url" string field, and "url" represents a file like an image, movie, svg, audio, nine-patch image, etc. The "url" identifies the location of the asset's resource and may point to an online resource via HTTP or a local resource (using relative pathing). For convenience, an optional top level field called "search" provides an array to provide the runtime a path to search for the resources. The "url" must contain an extension to indicate the nature (image, animation, movie, audio) of the resource.
 
-Beyond mapping asset ids to files, the asset object is an opportunity to provide parameters on how that particular asset is to be used. For example, a nine-patch image requires four integer values as to how to slice the image up to scale. Similarly, a set of assets may share a file with different parameters so tile-maps and an image atlas may be used.
+Beyond mapping asset ids to files, the asset object is an opportunity to provide parameters on how that particular asset is to be used.
+For example, a nine-patch image requires four integer values as to how to slice the image up to scale.
+Similarly, a set of assets may share a file with different parameters so tile-maps and an image atlas may be used.
 
 ### 'assets' example
 
@@ -56,17 +65,23 @@ Beyond mapping asset ids to files, the asset object is an opportunity to provide
 
 ## Forest
 
-Roslin uses an [l-system](https://en.wikipedia.org/wiki/L-system) inspired approach where you have a forest of cards. Cards are simply functions that turn JSON into a scalable image. The root field "forest" is an object mapping names (i.e. card ids) to cards. A card is an object with parameters and instructions on how to pull data from JSON, draw it, and map any feedback. 
+Roslin uses an [l-system](https://en.wikipedia.org/wiki/L-system) inspired approach where you have a forest of cards.
+Cards are simply functions that turn JSON into a scalable image.
+The root field "forest" is an object mapping names (i.e. card ids) to cards.
+A card is an object with parameters and instructions on how to pull data from JSON, draw it, and map any feedback. 
 
-First, a card has a "x" and "y" tracking lines which are in pixel units; tracking lines will be explained in [the below section in layout](#layout-engine), but both x and y are arrays where the final element is width and height, respectively. The below example has dimensions of 400 pixels by 300 pixels.
+First, a card has a "x" and "y" tracking lines which are in pixel units; tracking lines will be explained in [the below section in layout](#layout-engine), but both x and y are arrays where the final element is width and height, respectively.
+The below example has dimensions of 400 pixels by 300 pixels.
 
-Second, the card also has a field called "items" which is a array of items. An item is an object which is a dynamically typed object that is determined on the fly.
+Second, the card also has a field called "items" which is a array of items.
+An item is an object which is a dynamically typed object that is determined on the fly; items are fundamentally uses ideas inspired from [entity component systems](https://en.wikipedia.org/wiki/Entity_component_system) where there are no direct types of items. Instead, the behavior is the composition of fields within an item.
 
-An item fundamentally uses ideas inspired from [entity component systems](https://en.wikipedia.org/wiki/Entity_component_system) where there are no direct types of items. Instead, the behavior is the composition of fields within an item.
+For example, an item may have a field called 'box' will which indicate the item will render a box.
+The 'box' object has at least two parameters: "stroke", "fill" which sit inside the object.
+More details can be found in the later sections, but we draw a white box with black border by setting the 'stroke' to "#000" and 'fill' to "#fff".
 
-For example, an item may have a field called 'shape' will which indicate the item will render a shape. The 'shape' object has at least three parameters: "shape", "stroke", "fill" which sit inside the object. More details can be found in the later sections, but we will set "shape" to "box" to render a box with stroke set to "#000" and fill set to "#fff". This will render a white box with a black border.
-
-An item may also have a field called 'matrix' which will define how to position and size the box. The defaults of this will be outlined in the [layout engine](#layout-engine) section.
+An item may also have a field called 'matrix' which will define how to position and size the box.
+The defaults of this will be outlined in the [layout engine](#layout-engine) section.
 
 We give this card the name "simple-white-box", and then use the top-level field "default" to set this card as the root card.
 
@@ -80,11 +95,9 @@ We give this card the name "simple-white-box", and then use the top-level field 
             "y": [0, 300],
             "items": [
                 {
-                    "body": {
-                        "box": {
-                            "stroke": "#000",
-                            "fill": "#fff"
-                        }
+                    "box": {
+                        "stroke": "#000",
+                        "fill": "#fff"
                     },
                     "matrix": { ... }
                 }
